@@ -54,12 +54,24 @@ Default long-context settings:
 
 ```text
 MAX_MODEL_LEN=262144
-GPU_MEMORY_UTILIZATION=0.968
+GPU_MEMORY_UTILIZATION=0.94
 MAX_NUM_SEQS=1
 KV_CACHE_DTYPE=auto
 ```
 
-The `MAX_NUM_SEQS=1` default prioritizes one very long request over concurrency. In testing, `GPU_MEMORY_UTILIZATION=0.969` failed the vLLM startup memory guard on the RTX 4500 Ada desktop session, while `0.968` started successfully.
+The `MAX_NUM_SEQS=1` default prioritizes one very long request over concurrency. `GPU_MEMORY_UTILIZATION=0.94` leaves runtime headroom on the RTX 4500 Ada while still fitting the full `262144` token context. FlashInfer top-p/top-k sampling is disabled by default to avoid local CUDA kernel compilation.
+
+To install vLLM as a user systemd service:
+
+```bash
+./scripts/install-local-vllm-service.sh
+```
+
+The service is named:
+
+```text
+local-llm-vllm.service
+```
 
 Useful overrides:
 

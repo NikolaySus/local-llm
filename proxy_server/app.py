@@ -1,9 +1,10 @@
+import json
 import os
 from typing import AsyncIterator
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 
 UPSTREAM_BASE_URL = os.environ.get("UPSTREAM_BASE_URL", "http://127.0.0.1:18000").rstrip("/")
@@ -11,6 +12,17 @@ PUBLIC_API_KEY = os.environ.get("PUBLIC_API_KEY", "")
 REQUEST_TIMEOUT_SECONDS = float(os.environ.get("REQUEST_TIMEOUT_SECONDS", "600"))
 
 app = FastAPI(title="Local LLM OpenAI Proxy")
+
+
+UPSTREAM_ERRORS = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.ReadError,
+    httpx.ReadTimeout,
+    httpx.RemoteProtocolError,
+    httpx.WriteError,
+    httpx.WriteTimeout,
+)
 
 
 def require_auth(authorization: str | None) -> None:
@@ -30,9 +42,14 @@ async def health() -> dict[str, str]:
 async def upstream_health(authorization: str | None = Header(default=None)) -> dict[str, str]:
     require_auth(authorization)
     timeout = httpx.Timeout(10.0, connect=5.0)
-    async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
-        response = await client.get(f"{UPSTREAM_BASE_URL}/health")
-        response.raise_for_status()
+    try:
+        async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+            response = await client.get(f"{UPSTREAM_BASE_URL}/health")
+            response.raise_for_status()
+    except UPSTREAM_ERRORS as exc:
+        raise HTTPException(status_code=502, detail=f"Upstream vLLM is unavailable: {exc}") from exc
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"Upstream health check failed: {exc.response.status_code}") from exc
     return {"status": "ok"}
 
 
@@ -56,7 +73,19 @@ async def proxy_openai(path: str, request: Request, authorization: str | None = 
         headers=headers,
         content=body,
     )
-    upstream_response = await client.send(upstream_request, stream=True)
+    try:
+        upstream_response = await client.send(upstream_request, stream=True)
+    except UPSTREAM_ERRORS as exc:
+        await client.aclose()
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": {
+                    "message": f"Upstream vLLM is unavailable: {exc}",
+                    "type": "upstream_unavailable",
+                }
+            },
+        )
 
     response_headers = {
         key: value
@@ -68,6 +97,9 @@ async def proxy_openai(path: str, request: Request, authorization: str | None = 
         try:
             async for chunk in upstream_response.aiter_bytes():
                 yield chunk
+        except UPSTREAM_ERRORS as exc:
+            payload = json.dumps({"error": f"Upstream vLLM stream failed: {exc}"})
+            yield f"event: error\ndata: {payload}\n\n".encode()
         finally:
             await upstream_response.aclose()
             await client.aclose()
@@ -81,7 +113,20 @@ async def proxy_openai(path: str, request: Request, authorization: str | None = 
             media_type="text/event-stream",
         )
 
-    content = await upstream_response.aread()
-    await upstream_response.aclose()
-    await client.aclose()
+    try:
+        content = await upstream_response.aread()
+    except UPSTREAM_ERRORS as exc:
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": {
+                    "message": f"Upstream vLLM response failed: {exc}",
+                    "type": "upstream_unavailable",
+                }
+            },
+        )
+    finally:
+        if not upstream_response.is_closed:
+            await upstream_response.aclose()
+        await client.aclose()
     return Response(content=content, status_code=upstream_response.status_code, headers=response_headers)
