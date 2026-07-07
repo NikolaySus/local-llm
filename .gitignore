@@ -2,3 +2,6 @@
 models/
 *.log
 *.pid
+*.pub.tmp
+.secrets/
+__pycache__/
