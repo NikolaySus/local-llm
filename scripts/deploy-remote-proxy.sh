@@ -64,6 +64,7 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable --now local-llm-proxy.service
+systemctl enable local-llm-proxy.service
+systemctl restart local-llm-proxy.service
 systemctl status --no-pager local-llm-proxy.service
 REMOTE
