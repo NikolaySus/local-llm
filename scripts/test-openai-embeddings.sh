@@ -17,4 +17,3 @@ curl --noproxy '*' -fsS "$BASE_URL/embeddings" \
   "input": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: What is the capital of Russia?"
 }
 JSON
-

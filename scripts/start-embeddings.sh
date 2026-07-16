@@ -14,4 +14,3 @@ exec "$ROOT_DIR/embedding_server/.venv/bin/uvicorn" embedding_server.app:app \
   --port "$PORT" \
   --workers 1 \
   --no-access-log
-
