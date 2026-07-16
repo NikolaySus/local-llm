@@ -56,7 +56,7 @@ Type=simple
 WorkingDirectory=$REMOTE_DIR
 EnvironmentFile=/etc/local-llm-proxy.env
 ExecStart=$REMOTE_DIR/.venv-proxy/bin/uvicorn proxy_server.app:app --host \${HOST} --port \${PORT}
-Restart=always
+Restart=on-failure
 RestartSec=5
 
 [Install]
@@ -64,7 +64,7 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable local-llm-proxy.service
+systemctl disable local-llm-proxy.service >/dev/null 2>&1 || true
 systemctl restart local-llm-proxy.service
 systemctl status --no-pager local-llm-proxy.service
 REMOTE

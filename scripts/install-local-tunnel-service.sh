@@ -14,7 +14,7 @@ After=network-online.target
 Type=simple
 WorkingDirectory=$ROOT_DIR
 ExecStart=$ROOT_DIR/scripts/start-tunnel.sh
-Restart=always
+Restart=on-failure
 RestartSec=5
 
 [Install]
@@ -22,5 +22,5 @@ WantedBy=default.target
 UNIT
 
 systemctl --user daemon-reload
-systemctl --user enable --now local-llm-tunnel.service
-systemctl --user status --no-pager local-llm-tunnel.service
+systemctl --user disable local-llm-tunnel.service >/dev/null 2>&1 || true
+echo "Installed $SERVICE_PATH (disabled; managed by scripts/model-service.sh)"

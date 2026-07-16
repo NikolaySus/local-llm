@@ -12,12 +12,13 @@ cat >"$SERVICE_FILE" <<EOF
 Description=Local vLLM OpenAI-compatible API
 After=network-online.target
 Wants=network-online.target
+Conflicts=local-llm-embeddings.service
 
 [Service]
 Type=simple
 WorkingDirectory=$ROOT_DIR
 ExecStart=$ROOT_DIR/scripts/start-vllm.sh
-Restart=always
+Restart=on-failure
 RestartSec=10
 KillSignal=SIGINT
 TimeoutStopSec=120
@@ -27,6 +28,6 @@ WantedBy=default.target
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now local-llm-vllm.service
+systemctl --user disable local-llm-vllm.service >/dev/null 2>&1 || true
 
-echo "Installed and started $SERVICE_FILE"
+echo "Installed $SERVICE_FILE (disabled; use scripts/model-service.sh switch gemma)"

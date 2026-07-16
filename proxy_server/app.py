@@ -47,7 +47,7 @@ async def upstream_health(authorization: str | None = Header(default=None)) -> d
             response = await client.get(f"{UPSTREAM_BASE_URL}/health")
             response.raise_for_status()
     except UPSTREAM_ERRORS as exc:
-        raise HTTPException(status_code=502, detail=f"Upstream vLLM is unavailable: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Upstream model service is unavailable: {exc}") from exc
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=f"Upstream health check failed: {exc.response.status_code}") from exc
     return {"status": "ok"}
@@ -81,7 +81,7 @@ async def proxy_openai(path: str, request: Request, authorization: str | None = 
             status_code=502,
             content={
                 "error": {
-                    "message": f"Upstream vLLM is unavailable: {exc}",
+                    "message": f"Upstream model service is unavailable: {exc}",
                     "type": "upstream_unavailable",
                 }
             },
@@ -98,7 +98,7 @@ async def proxy_openai(path: str, request: Request, authorization: str | None = 
             async for chunk in upstream_response.aiter_bytes():
                 yield chunk
         except UPSTREAM_ERRORS as exc:
-            payload = json.dumps({"error": f"Upstream vLLM stream failed: {exc}"})
+            payload = json.dumps({"error": f"Upstream model service stream failed: {exc}"})
             yield f"event: error\ndata: {payload}\n\n".encode()
         finally:
             await upstream_response.aclose()
@@ -120,7 +120,7 @@ async def proxy_openai(path: str, request: Request, authorization: str | None = 
             status_code=502,
             content={
                 "error": {
-                    "message": f"Upstream vLLM response failed: {exc}",
+                    "message": f"Upstream model service response failed: {exc}",
                     "type": "upstream_unavailable",
                 }
             },
